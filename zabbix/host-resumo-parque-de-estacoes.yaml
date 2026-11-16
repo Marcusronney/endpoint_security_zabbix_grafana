@@ -1,0 +1,294 @@
+zabbix_export:
+  version: '7.4'
+  host_groups:
+    - uuid: e7fd750b901d4253855221e21f7e368a
+      name: 'Resumo do Parque'
+  hosts:
+    - host: 'Resumo Parque Estacoes'
+      name: 'Resumo - Parque de Estações'
+      description: 'Host lógico só com itens calculados que resumem as estações do grupo host_AD. Usado pelo dashboard "Estações de Trabalho – Visão do Parque" no Grafana. Criado por Claude em 04/11/2026.'
+      groups:
+        - name: 'Resumo do Parque'
+      items:
+        - name: 'Parque: agentes Zabbix respondendo'
+          type: CALCULATED
+          key: parque.agent.ok
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/agent.ping?[group="{$WS.GROUP}"],10m),"eq",1)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: disco C: com BitLocker ligado'
+          type: CALCULATED
+          key: parque.bitlocker.on
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/wmi.get[root\CIMV2\Security\MicrosoftVolumeEncryption,"select ProtectionStatus from Win32_EncryptableVolume where DriveLetter=''C:''"]?[group="{$WS.GROUP}"],1d),"eq",1)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: CPU média das estações ligadas'
+          type: CALCULATED
+          key: parque.cpu.avg
+          delay: 5m
+          history: 90d
+          value_type: FLOAT
+          units: '%'
+          params: 'avg(last_foreach(/*/system.cpu.util?[group="{$WS.GROUP}"],10m))'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações com CPU > 90%'
+          type: CALCULATED
+          key: parque.cpu.high
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/system.cpu.util?[group="{$WS.GROUP}"],10m),"gt",90)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: antivírus desligado'
+          type: CALCULATED
+          key: parque.def.av_off
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/ws.def[av]?[group="{$WS.GROUP}"],1h),"eq",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: verificação completa nunca executada'
+          type: CALCULATED
+          key: parque.def.full_never
+          delay: 5m
+          history: 365d
+          params: 'count(last_foreach(/*/ws.def[full_age]?[group="{$WS.GROUP}"],1h),"eq",-1)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: Defender com problema (AV/tempo real/assinatura)'
+          type: CALCULATED
+          key: parque.def.notok
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/ws.def[ok]?[group="{$WS.GROUP}"],1h),"eq",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: Defender OK'
+          type: CALCULATED
+          key: parque.def.ok
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/ws.def[ok]?[group="{$WS.GROUP}"],1h),"eq",1)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: Defender em modo passivo (outro antivírus)'
+          type: CALCULATED
+          key: parque.def.passive
+          delay: 5m
+          history: 365d
+          params: 'count(last_foreach(/*/ws.def[mode_normal]?[group="{$WS.GROUP}"],1h),"eq",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: verificação rápida há mais de 7 dias'
+          type: CALCULATED
+          key: parque.def.quick_old
+          delay: 5m
+          history: 365d
+          params: 'count(last_foreach(/*/ws.def[quick_age]?[group="{$WS.GROUP}"],1h),"gt",7)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações reportando Defender (1h)'
+          type: CALCULATED
+          key: parque.def.reporting
+          delay: 5m
+          history: 365d
+          params: 'count(last_foreach(/*/ws.def[av]?[group="{$WS.GROUP}"],1h))'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: proteção em tempo real desligada'
+          type: CALCULATED
+          key: parque.def.rtp_off
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/ws.def[rtp]?[group="{$WS.GROUP}"],1h),"eq",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: assinatura do Defender desatualizada'
+          type: CALCULATED
+          key: parque.def.sig_old
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/ws.def[sig_age]?[group="{$WS.GROUP}"],1h),"gt",{$WS.SIG.MAXAGE})'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: Tamper Protection desligada'
+          type: CALCULATED
+          key: parque.def.tamper_off
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/ws.def[tamper]?[group="{$WS.GROUP}"],1h),"eq",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações com disco C: > 90%'
+          type: CALCULATED
+          key: parque.disk.full
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/vfs.fs.dependent.size[C:,pused]?[group="{$WS.GROUP}"],2h),"gt",90)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações com os 3 perfis de firewall ligados'
+          type: CALCULATED
+          key: parque.fw.all_on
+          delay: 5m
+          history: 365d
+          params: 'count(last_foreach(/*/ws.fw[disabled]?[group="{$WS.GROUP}"],1h),"eq",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações com algum perfil de firewall desligado'
+          type: CALCULATED
+          key: parque.fw.any_off
+          delay: 5m
+          history: 365d
+          params: 'count(last_foreach(/*/ws.fw[disabled]?[group="{$WS.GROUP}"],1h),"gt",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: firewall (perfil Domínio) desligado'
+          type: CALCULATED
+          key: parque.fw.domain_off
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/ws.fw[domain]?[group="{$WS.GROUP}"],1h),"eq",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações desligadas/sem resposta'
+          type: CALCULATED
+          key: parque.hosts.offline
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/icmpping?[group="{$WS.GROUP}"],10m),"eq",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações ligadas (respondem ping)'
+          type: CALCULATED
+          key: parque.hosts.online
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/icmpping?[group="{$WS.GROUP}"],10m),"eq",1)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações monitoradas'
+          type: CALCULATED
+          key: parque.hosts.total
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/icmpping?[group="{$WS.GROUP}"],10m))'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: memória média das estações ligadas'
+          type: CALCULATED
+          key: parque.mem.avg
+          delay: 5m
+          history: 90d
+          value_type: FLOAT
+          units: '%'
+          params: 'avg(last_foreach(/*/vm.memory.util?[group="{$WS.GROUP}"],10m))'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações com memória > 90%'
+          type: CALCULATED
+          key: parque.mem.high
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/vm.memory.util?[group="{$WS.GROUP}"],10m),"gt",90)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações sem patch há mais de 45 dias'
+          type: CALCULATED
+          key: parque.patch.old
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/ws.patch[age]?[group="{$WS.GROUP}"],1d),"gt",45)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações com reinício pendente'
+          type: CALCULATED
+          key: parque.reboot.pending
+          delay: 5m
+          history: 90d
+          params: 'count(last_foreach(/*/registry.get["HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"]?[group="{$WS.GROUP}"],2h),"eq",1)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: detecções nos últimos 7 dias (soma)'
+          type: CALCULATED
+          key: parque.threats.7d
+          delay: 5m
+          history: 90d
+          params: 'sum(last_foreach(/*/ws.threats[7d]?[group="{$WS.GROUP}"],1h))'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: ameaças ativas (soma)'
+          type: CALCULATED
+          key: parque.threats.active
+          delay: 5m
+          history: 90d
+          params: 'sum(last_foreach(/*/ws.threats[active]?[group="{$WS.GROUP}"],1h))'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações com detecção nos últimos 7 dias'
+          type: CALCULATED
+          key: parque.threats.hosts_7d
+          delay: 5m
+          history: 365d
+          params: 'count(last_foreach(/*/ws.threats[7d]?[group="{$WS.GROUP}"],1h),"gt",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: estações com ameaça ativa'
+          type: CALCULATED
+          key: parque.threats.hosts_active
+          delay: 5m
+          history: 365d
+          params: 'count(last_foreach(/*/ws.threats[active]?[group="{$WS.GROUP}"],1h),"gt",0)'
+          tags:
+            - tag: scope
+              value: parque
+        - name: 'Parque: detecções registradas (soma de todas as estações)'
+          type: CALCULATED
+          key: parque.threats.total
+          delay: 5m
+          history: 365d
+          params: 'sum(last_foreach(/*/ws.threats[total]?[group="{$WS.GROUP}"],1h))'
+          tags:
+            - tag: scope
+              value: parque
+      tags:
+        - tag: scope
+          value: parque
+      macros:
+        - macro: '{$WS.GROUP}'
+          value: host_AD
+        - macro: '{$WS.SIG.MAXAGE}'
+          value: '5'

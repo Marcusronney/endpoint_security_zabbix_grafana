@@ -1,0 +1,11 @@
+# Trechos recomendados para C:\Program Files\Zabbix Agent 2\zabbix_agent2.conf nas estações 3F
+# (o Install-ZabbixAgent2.ps1 já grava estas linhas)
+
+Server=192.168.0.40
+ServerActive=192.168.0.40
+# Hostname igual ao FQDN da estação, ex.: N3F135.f3f.local
+Hostname=N3F135.f3f.local
+# Usado pela ação de autorregistro para vincular o template e o grupo host_AD
+HostMetadata=Windows-Estacao-3F
+# Consultas WMI do Defender podem demorar alguns segundos
+Timeout=10

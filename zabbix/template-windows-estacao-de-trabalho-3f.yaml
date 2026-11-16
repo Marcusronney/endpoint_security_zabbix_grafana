@@ -1,0 +1,908 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 8fb62aef15ca465398f1bc519daa3f5b
+      name: 'Templates Custom'
+  templates:
+    - uuid: 123538b0ad184ef288d395f9ee394c91
+      template: 'Windows Estacao de Trabalho 3F'
+      name: 'Windows – Estação de Trabalho (3F)'
+      description: 'Complementa "Windows by Zabbix agent" e "Windows Defender WMI" nas estações do AD: estado do Defender em números (para agregação), ameaças detectadas, firewall, BitLocker, reinício pendente, idade do último patch e inventário (fabricante, modelo, série, usuário logado, SO). Tudo via WMI/registro do próprio agente, sem scripts. Criado por Claude em 04/11/2026.'
+      groups:
+        - name: 'Templates Custom'
+      items:
+        - uuid: 9cc1dccc771f4d44856a49f3f4bf266c
+          name: 'Windows Update: reinício pendente'
+          key: 'registry.get["HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"]'
+          delay: 30m
+          description: '1 = existe a chave RebootRequired (atualização aguardando reinício).'
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - '-1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: NAO
+            - type: JAVASCRIPT
+              parameters:
+                - 'return value === "NAO" ? 0 : 1;'
+          tags:
+            - tag: component
+              value: windows-update
+          triggers:
+            - uuid: f13de372ab414f0980786e3748801eef
+              expression: 'min(/Windows Estacao de Trabalho 3F/registry.get["HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"],{$WS.REBOOT.MAXAGE})=1'
+              name: 'Windows Update: reinício pendente há mais de {$WS.REBOOT.MAXAGE} em {HOST.NAME}'
+              priority: INFO
+              tags:
+                - tag: scope
+                  value: patch
+        - uuid: 74008707879349ad85115d4e2d0e9a06
+          name: 'Inventário: SO bruto (Win32_OperatingSystem)'
+          key: 'wmi.getall[root\cimv2,"select Caption,Version,BuildNumber,InstallDate from Win32_OperatingSystem"]'
+          delay: 1h
+          history: '0'
+          value_type: TEXT
+          tags:
+            - tag: component
+              value: inventario
+        - uuid: 91d75d521f264c919e82367dcf5259b6
+          name: 'Windows Update: hotfixes bruto (Win32_QuickFixEngineering)'
+          key: 'wmi.getall[root\cimv2,"select HotFixID,InstalledOn from Win32_QuickFixEngineering"]'
+          delay: 6h
+          history: '0'
+          value_type: TEXT
+          tags:
+            - tag: component
+              value: windows-update
+        - uuid: 3f2dc77946904a459ee236249ca88d80
+          name: 'Rede: adaptadores bruto (Win32_NetworkAdapterConfiguration)'
+          key: 'wmi.getall[root\cimv2,"select MACAddress,IPAddress,Description from Win32_NetworkAdapterConfiguration where IPEnabled=True"]'
+          delay: 1h
+          history: '0'
+          value_type: TEXT
+          tags:
+            - tag: component
+              value: portmap
+        - uuid: 982ce0d18ad9456b930ba895f03d6e61
+          name: 'Inventário: sistema bruto (Win32_ComputerSystem)'
+          key: 'wmi.getall[root\cimv2,"select Manufacturer,Model,UserName,TotalPhysicalMemory from Win32_ComputerSystem"]'
+          delay: 1h
+          history: '0'
+          value_type: TEXT
+          tags:
+            - tag: component
+              value: inventario
+        - uuid: 922e8a94be284b248e45403e1cf1802f
+          name: 'Defender: status bruto (MSFT_MpComputerStatus)'
+          key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          delay: 15m
+          history: '0'
+          value_type: TEXT
+          tags:
+            - tag: component
+              value: defender
+        - uuid: fb3292b2970d42769ae76928f2b82f07
+          name: 'Defender: detecções detalhe bruto (MSFT_MpThreatDetection)'
+          key: 'wmi.getall[root\Microsoft\Windows\Defender,"select DetectionID,ThreatID,ThreatStatusID,InitialDetectionTime,LastThreatStatusChangeTime,RemediationTime,ProcessName,DomainUser,Resources,ActionSuccess,DetectionSourceTypeID,CleaningActionID from MSFT_MpThreatDetection"]'
+          delay: 15m
+          history: '0'
+          value_type: TEXT
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - '-1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '[]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: ed6a63cb56774deda0ac9bbbc4f88fe2
+          name: 'Defender: ameaças bruto (MSFT_MpThreat)'
+          key: 'wmi.getall[root\Microsoft\Windows\Defender,"select ThreatID,ThreatName,SeverityID,CategoryID,IsActive,DidThreatExecute,Resources from MSFT_MpThreat"]'
+          delay: 15m
+          history: '0'
+          value_type: TEXT
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - '-1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '[]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: d0c017e615714eb683eca9e5a2bc9b07
+          name: 'Defender: detecções bruto (MSFT_MpThreatDetection)'
+          key: 'wmi.getall[root\Microsoft\Windows\Defender,"select ThreatID,ThreatStatusID,InitialDetectionTime from MSFT_MpThreatDetection"]'
+          delay: 15m
+          history: '0'
+          value_type: TEXT
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - '-1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '[]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: 98bcb4cf91ca4981b0ee46262e0119db
+          name: 'Firewall: perfis bruto (MSFT_NetFirewallProfile)'
+          key: 'wmi.getall[root\StandardCimv2,"select Name,Enabled from MSFT_NetFirewallProfile"]'
+          delay: 15m
+          history: '0'
+          value_type: TEXT
+          tags:
+            - tag: component
+              value: firewall
+        - uuid: 58eebdcdd0704e0d9f604e98e75dce9e
+          name: 'Inventário: número de série (BIOS)'
+          key: 'wmi.get[root\cimv2,"select SerialNumber from Win32_BIOS"]'
+          delay: 1d
+          history: 90d
+          value_type: CHAR
+          tags:
+            - tag: component
+              value: inventario
+        - uuid: 6f99660c7e814aff8d24e54dbbc6c889
+          name: 'BitLocker: proteção do disco C:'
+          key: 'wmi.get[root\CIMV2\Security\MicrosoftVolumeEncryption,"select ProtectionStatus from Win32_EncryptableVolume where DriveLetter=''C:''"]'
+          delay: 1h
+          description: '0 = desligado, 1 = ligado, 2 = desconhecido; -1 = BitLocker indisponível nesta edição.'
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - '-1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '-1'
+          tags:
+            - tag: component
+              value: bitlocker
+        - uuid: 5ba077269ab74e5c9b962f46cbd4c842
+          name: 'Defender: antivírus ativo'
+          type: DEPENDENT
+          key: 'ws.def[av]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].AntivirusEnabled'
+            - type: BOOL_TO_DECIMAL
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: ee48f094ab4b42b4a6b125c62ffd30a6
+          name: 'Defender: monitoramento de comportamento'
+          type: DEPENDENT
+          key: 'ws.def[behavior]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].BehaviorMonitorEnabled'
+            - type: BOOL_TO_DECIMAL
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: c95ad29b02de40d69f912241395e04f3
+          name: 'Defender: dias desde a verificação completa'
+          type: DEPENDENT
+          key: 'ws.def[full_age]'
+          value_type: FLOAT
+          units: dias
+          description: '-1 = nunca executada'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].FullScanAge'
+            - type: JAVASCRIPT
+              parameters:
+                - 'return Number(value) >= 4294967295 ? -1 : Number(value);'
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: e4dab0d3c5d445e498358f6a85f161b8
+          name: 'Defender: modo de execução'
+          type: DEPENDENT
+          key: 'ws.def[mode]'
+          value_type: CHAR
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].AMRunningMode'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: desconhecido
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: 35dc6bf088284246bb9d2c5a6e83f29b
+          name: 'Defender: em modo Normal (não passivo)'
+          type: DEPENDENT
+          key: 'ws.def[mode_normal]'
+          description: '1 = Defender é o antivírus ativo. 0 = modo passivo/EDR (outro antivírus instalado) ou desconhecido.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var s = JSON.parse(value)[0];
+                  return String(s.AMRunningMode) === "Normal" ? 1 : 0;
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: 4ca063d595614035955165cc1e16e1ad
+          name: 'Defender: proteção OK (AV + tempo real + assinatura em dia)'
+          type: DEPENDENT
+          key: 'ws.def[ok]'
+          description: '1 = antivírus ativo, proteção em tempo real ligada e assinatura com até {$WS.SIG.MAXAGE} dias. 0 = algum desses falhou.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var s = JSON.parse(value)[0];
+                  return (s.AntivirusEnabled && s.RealTimeProtectionEnabled && Number(s.AntivirusSignatureAge) <= {$WS.SIG.MAXAGE}) ? 1 : 0;
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: bd11a32918e740b0bf6fc505f254eba7
+          name: 'Defender: dias desde a verificação rápida'
+          type: DEPENDENT
+          key: 'ws.def[quick_age]'
+          value_type: FLOAT
+          units: dias
+          description: '-1 = nunca executada'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].QuickScanAge'
+            - type: JAVASCRIPT
+              parameters:
+                - 'return Number(value) >= 4294967295 ? -1 : Number(value);'
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: 345b07dc3ee240a7b0e6f09ef9542d63
+          name: 'Defender: proteção em tempo real'
+          type: DEPENDENT
+          key: 'ws.def[rtp]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].RealTimeProtectionEnabled'
+            - type: BOOL_TO_DECIMAL
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: d60553f9f27648468d0d46810efcdfe7
+          name: 'Defender: serviço antimalware ativo'
+          type: DEPENDENT
+          key: 'ws.def[service]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].AMServiceEnabled'
+            - type: BOOL_TO_DECIMAL
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: ee26ff06a7b148a8a9c84ca9e9d2e16d
+          name: 'Defender: idade da assinatura'
+          type: DEPENDENT
+          key: 'ws.def[sig_age]'
+          units: dias
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].AntivirusSignatureAge'
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: 6af1ae55f9674246b1581e5682757f5e
+          name: 'Defender: versão da assinatura'
+          type: DEPENDENT
+          key: 'ws.def[sig_version]'
+          value_type: CHAR
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].AntivirusSignatureVersion'
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: 9a78578aa44248c982a8347b93bec461
+          name: 'Defender: proteção contra adulteração (Tamper)'
+          type: DEPENDENT
+          key: 'ws.def[tamper]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].IsTamperProtected'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: 'false'
+            - type: BOOL_TO_DECIMAL
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+          triggers:
+            - uuid: 1238fb9b2afc426c99bc7610283155a6
+              expression: 'last(/Windows Estacao de Trabalho 3F/ws.def[tamper])=0'
+              name: 'Defender: proteção contra adulteração (Tamper) desligada em {HOST.NAME}'
+              priority: WARNING
+              tags:
+                - tag: scope
+                  value: security
+        - uuid: 4dec5f11ba12481b9baa2e059849bddc
+          name: 'Defender: versão do produto'
+          type: DEPENDENT
+          key: 'ws.def[version]'
+          value_type: CHAR
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].AMProductVersion'
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select * from MSFT_MpComputerStatus"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: dc27eb20e17649f8a8a41bfb4136ff95
+          name: 'Firewall: perfis desativados'
+          type: DEPENDENT
+          key: 'ws.fw[disabled]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value);
+                  if (!Array.isArray(a)) a = [a];
+                  var n = 0;
+                  for (var i = 0; i < a.length; i++) { var e = a[i].Enabled; if (e === 0 || e === false || e === "0" || e === "False") n++; }
+                  return n;
+          master_item:
+            key: 'wmi.getall[root\StandardCimv2,"select Name,Enabled from MSFT_NetFirewallProfile"]'
+          tags:
+            - tag: component
+              value: firewall
+        - uuid: 39558ad107474cb89454a98e6767b97c
+          name: 'Firewall: perfil Domínio ativo'
+          type: DEPENDENT
+          key: 'ws.fw[domain]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value);
+                  if (!Array.isArray(a)) a = [a];
+                  for (var i = 0; i < a.length; i++) if (a[i].Name === "Domain") { var e = a[i].Enabled; return (e === 0 || e === false || e === "0" || e === "False") ? 0 : 1; }
+                  return -1;
+          master_item:
+            key: 'wmi.getall[root\StandardCimv2,"select Name,Enabled from MSFT_NetFirewallProfile"]'
+          tags:
+            - tag: component
+              value: firewall
+          triggers:
+            - uuid: 73d4a1a2c5a24155be6f9dea96c6eb44
+              expression: 'last(/Windows Estacao de Trabalho 3F/ws.fw[domain])=0'
+              name: 'Firewall do Windows: perfil Domínio desligado em {HOST.NAME}'
+              priority: AVERAGE
+              tags:
+                - tag: scope
+                  value: security
+        - uuid: f69ea3f055ab435d82c3221297585ee9
+          name: 'Firewall: perfis ativos'
+          type: DEPENDENT
+          key: 'ws.fw[enabled]'
+          description: 'Quantos perfis (Domínio, Privado, Público) estão ligados.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value);
+                  if (!Array.isArray(a)) a = [a];
+                  var n = 0;
+                  for (var i = 0; i < a.length; i++) { var e = a[i].Enabled; if (e === 1 || e === true || e === "1" || e === "True") n++; }
+                  return n;
+          master_item:
+            key: 'wmi.getall[root\StandardCimv2,"select Name,Enabled from MSFT_NetFirewallProfile"]'
+          tags:
+            - tag: component
+              value: firewall
+        - uuid: 2f667b475fb040c5aac36093f7893330
+          name: 'Firewall: estado dos perfis'
+          type: DEPENDENT
+          key: 'ws.fw[profiles]'
+          value_type: CHAR
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value);
+                  if (!Array.isArray(a)) a = [a];
+                  var o = [];
+                  for (var i = 0; i < a.length; i++) { var e = a[i].Enabled; o.push(a[i].Name + ": " + ((e === 0 || e === false || e === "0" || e === "False") ? "DESLIGADO" : "ligado")); }
+                  return o.join(", ");
+          master_item:
+            key: 'wmi.getall[root\StandardCimv2,"select Name,Enabled from MSFT_NetFirewallProfile"]'
+          tags:
+            - tag: component
+              value: firewall
+        - uuid: 48bc2a6ae05242068a0459fa0e3be807
+          name: 'Inventário: fabricante'
+          type: DEPENDENT
+          key: 'ws.inv[manufacturer]'
+          history: 90d
+          value_type: CHAR
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].Manufacturer'
+          master_item:
+            key: 'wmi.getall[root\cimv2,"select Manufacturer,Model,UserName,TotalPhysicalMemory from Win32_ComputerSystem"]'
+          tags:
+            - tag: component
+              value: inventario
+        - uuid: bd61d61a492d4db38e400531cf9543a2
+          name: 'Inventário: modelo'
+          type: DEPENDENT
+          key: 'ws.inv[model]'
+          history: 90d
+          value_type: CHAR
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].Model'
+          master_item:
+            key: 'wmi.getall[root\cimv2,"select Manufacturer,Model,UserName,TotalPhysicalMemory from Win32_ComputerSystem"]'
+          tags:
+            - tag: component
+              value: inventario
+        - uuid: 1984604ede574a7d850982cef2b5cc9a
+          name: 'Inventário: usuário logado'
+          type: DEPENDENT
+          key: 'ws.inv[user]'
+          history: 90d
+          value_type: CHAR
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].UserName'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: (ninguém)
+          master_item:
+            key: 'wmi.getall[root\cimv2,"select Manufacturer,Model,UserName,TotalPhysicalMemory from Win32_ComputerSystem"]'
+          tags:
+            - tag: component
+              value: inventario
+        - uuid: 6ab213ffbadc44189bac9c4d5511b1cf
+          name: 'Inventário: sistema operacional'
+          type: DEPENDENT
+          key: 'ws.os[caption]'
+          history: 90d
+          value_type: CHAR
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].Caption'
+          master_item:
+            key: 'wmi.getall[root\cimv2,"select Caption,Version,BuildNumber,InstallDate from Win32_OperatingSystem"]'
+          tags:
+            - tag: component
+              value: inventario
+        - uuid: 3ea9bea5d28c412ababa06c53da2af52
+          name: 'Inventário: versão do Windows (build)'
+          type: DEPENDENT
+          key: 'ws.os[version]'
+          history: 90d
+          value_type: CHAR
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$[0].Version'
+          master_item:
+            key: 'wmi.getall[root\cimv2,"select Caption,Version,BuildNumber,InstallDate from Win32_OperatingSystem"]'
+          tags:
+            - tag: component
+              value: inventario
+        - uuid: 4c401dcf6129404985897101a897b9bf
+          name: 'Windows Update: dias desde o último patch'
+          type: DEPENDENT
+          key: 'ws.patch[age]'
+          units: dias
+          description: 'Calculado pela data mais recente em Win32_QuickFixEngineering.InstalledOn.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value);
+                  if (!Array.isArray(a)) a = [a];
+                  var now = Date.now(), best = 0;
+                  for (var i = 0; i < a.length; i++) {
+                    var s = String(a[i].InstalledOn || ""), m = s.match(/(\d{1,4})[\/\-.](\d{1,2})[\/\-.](\d{1,4})/);
+                    if (!m) continue;
+                    var x = +m[1], y = +m[2], z = +m[3], t;
+                    if (x > 1900) t = Date.UTC(x, y - 1, z);
+                    else { t = Date.UTC(z, x - 1, y); if (isNaN(t) || t > now || x > 12) t = Date.UTC(z, y - 1, x); }
+                    if (!isNaN(t) && t <= now && t > best) best = t;
+                  }
+                  if (!best) throw "nenhuma data de hotfix";
+                  return Math.floor((now - best) / 86400000);
+          master_item:
+            key: 'wmi.getall[root\cimv2,"select HotFixID,InstalledOn from Win32_QuickFixEngineering"]'
+          tags:
+            - tag: component
+              value: windows-update
+          triggers:
+            - uuid: e3b48fb750064b6abf9bb8ee2941cb2d
+              expression: 'last(/Windows Estacao de Trabalho 3F/ws.patch[age])>{$WS.PATCH.MAXAGE}'
+              name: 'Windows Update: {ITEM.LASTVALUE} dias sem atualização em {HOST.NAME}'
+              priority: INFO
+              description: 'Último hotfix instalado há mais de {$WS.PATCH.MAXAGE} dias.'
+              tags:
+                - tag: scope
+                  value: patch
+        - uuid: 7d2a341f4d6e4ce68b4583edde92a39e
+          name: 'Windows Update: hotfixes instalados'
+          type: DEPENDENT
+          key: 'ws.patch[count]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value);
+                  return Array.isArray(a) ? a.length : 1;
+          master_item:
+            key: 'wmi.getall[root\cimv2,"select HotFixID,InstalledOn from Win32_QuickFixEngineering"]'
+          tags:
+            - tag: component
+              value: windows-update
+        - uuid: 3353565066c042f89e829442d1ca3207
+          name: 'Defender: detecções nos últimos 7 dias'
+          type: DEPENDENT
+          key: 'ws.threats[7d]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value || "[]");
+                  if (!Array.isArray(a)) a = [a];
+                  var lim = Date.now() - 7 * 86400000, n = 0;
+                  for (var i = 0; i < a.length; i++) {
+                    var s = String(a[i].InitialDetectionTime || "");
+                    if (s.length < 14) continue;
+                    var t = Date.UTC(+s.substr(0,4), +s.substr(4,2) - 1, +s.substr(6,2), +s.substr(8,2), +s.substr(10,2), +s.substr(12,2));
+                    if (t >= lim) n++;
+                  }
+                  return n;
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select ThreatID,ThreatStatusID,InitialDetectionTime from MSFT_MpThreatDetection"]'
+          tags:
+            - tag: component
+              value: defender
+        - uuid: d2a6cd92a2034289b955247016ec058c
+          name: 'Defender: ameaças ativas (não resolvidas)'
+          type: DEPENDENT
+          key: 'ws.threats[active]'
+          description: 'Detecções com status Detectado, falha ao colocar em quarentena/remover/bloquear ou abandonada (ThreatStatusID 1,102,103,105,107).'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value || "[]");
+                  if (!Array.isArray(a)) a = [a];
+                  var bad = [1, 102, 103, 105, 107], n = 0;
+                  for (var i = 0; i < a.length; i++) if (bad.indexOf(Number(a[i].ThreatStatusID)) >= 0) n++;
+                  return n;
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select ThreatID,ThreatStatusID,InitialDetectionTime from MSFT_MpThreatDetection"]'
+          tags:
+            - tag: component
+              value: defender
+          triggers:
+            - uuid: 5303ff2865f64f34b6e2b4007b9af455
+              expression: 'last(/Windows Estacao de Trabalho 3F/ws.threats[active])>0'
+              name: 'Defender: {ITEM.LASTVALUE} ameaça(s) ativa(s) não resolvida(s) em {HOST.NAME}'
+              priority: HIGH
+              description: 'Há detecções que o Defender não conseguiu limpar/colocar em quarentena. Verificar em Segurança do Windows → Proteção contra vírus e ameaças → Histórico.'
+              tags:
+                - tag: scope
+                  value: security
+        - uuid: a4f3a2b3102d445298798854b962a463
+          name: 'Defender: detecções registradas (total)'
+          type: DEPENDENT
+          key: 'ws.threats[total]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value || "[]");
+                  if (!Array.isArray(a)) a = [a];
+                  return a.length;
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select ThreatID,ThreatStatusID,InitialDetectionTime from MSFT_MpThreatDetection"]'
+          tags:
+            - tag: component
+              value: defender
+          triggers:
+            - uuid: 5cea56157d094090aa52add998eec5e2
+              expression: 'change(/Windows Estacao de Trabalho 3F/ws.threats[total])>0'
+              name: 'Defender: nova ameaça detectada em {HOST.NAME}'
+              priority: AVERAGE
+              description: 'O número de detecções registradas aumentou. Mesmo que tenha sido removida, vale verificar a origem.'
+              manual_close: 'YES'
+              tags:
+                - tag: scope
+                  value: security
+      discovery_rules:
+        - uuid: 44612b4ba1924408ad4b72a1e9450984
+          name: 'Rede: adaptadores com IP'
+          type: DEPENDENT
+          key: portmap.nic.discovery
+          item_prototypes:
+            - uuid: b301e3f2245240a8a28b21a22f5e49ff
+              name: 'Interface de rede {#MAC}'
+              type: DEPENDENT
+              key: 'portmap.nic[{#MAC}]'
+              history: 90d
+              value_type: CHAR
+              description: '{#NIC}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var a = JSON.parse(value); if (!Array.isArray(a)) a = [a];
+                      var m = {};
+                      for (var i = 0; i < a.length; i++) { if (!a[i].MACAddress) continue; var ips = a[i].IPAddress; if (!Array.isArray(ips)) ips = [ips]; var v4 = []; for (var j = 0; j < ips.length; j++) if (/^\d+\.\d+\.\d+\.\d+$/.test(String(ips[j]))) v4.push(ips[j]); m[String(a[i].MACAddress).toUpperCase()] = { ip: v4.join(", "), d: a[i].Description || "" }; }
+                      var x = m["{#MAC}"]; return x ? x.ip : "—";
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1d
+              master_item:
+                key: 'wmi.getall[root\cimv2,"select MACAddress,IPAddress,Description from Win32_NetworkAdapterConfiguration where IPEnabled=True"]'
+              tags:
+                - tag: component
+                  value: portmap
+          master_item:
+            key: 'wmi.getall[root\cimv2,"select MACAddress,IPAddress,Description from Win32_NetworkAdapterConfiguration where IPEnabled=True"]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value); if (!Array.isArray(a)) a = [a];
+                  var m = {};
+                  for (var i = 0; i < a.length; i++) { if (!a[i].MACAddress) continue; var ips = a[i].IPAddress; if (!Array.isArray(ips)) ips = [ips]; var v4 = []; for (var j = 0; j < ips.length; j++) if (/^\d+\.\d+\.\d+\.\d+$/.test(String(ips[j]))) v4.push(ips[j]); m[String(a[i].MACAddress).toUpperCase()] = { ip: v4.join(", "), d: a[i].Description || "" }; }
+                  var o = []; for (var k in m) o.push({"{#MAC}": k, "{#NIC}": m[k].d}); return JSON.stringify(o);
+        - uuid: ecfb3087bd5d41a2baea254d10659082
+          name: 'Defender: ameaças conhecidas pela estação'
+          type: DEPENDENT
+          key: ws.threats.discovery
+          lifetime: 365d
+          description: 'Uma entrada por ameaça registrada no Defender (MSFT_MpThreat). Itens de ameaças que somem do Defender ficam 365 dias no Zabbix, preservando o histórico.'
+          item_prototypes:
+            - uuid: 1dfb6854f8354a729baa2efcb2ddda04
+              name: 'Ameaça {#TNAME}: ativa agora'
+              type: DEPENDENT
+              key: 'ws.threat.active[{#TID}]'
+              history: 365d
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var a = JSON.parse(value || "[]");
+                      if (!Array.isArray(a)) a = [a];
+                      for (var i = 0; i < a.length; i++) if (String(a[i].ThreatID) === "{#TID}") return (a[i].IsActive === true || a[i].IsActive === "True") ? 1 : 0;
+                      return 0;
+              master_item:
+                key: 'wmi.getall[root\Microsoft\Windows\Defender,"select ThreatID,ThreatName,SeverityID,CategoryID,IsActive,DidThreatExecute,Resources from MSFT_MpThreat"]'
+              tags:
+                - tag: category
+                  value: '{#CAT}'
+                - tag: component
+                  value: defender
+                - tag: severity
+                  value: '{#SEV}'
+                - tag: threat
+                  value: '{#TNAME}'
+            - uuid: 13c04d0a373e4aedb18fb3dce5e243f9
+              name: 'Ameaça {#TNAME}: detecções registradas'
+              type: DEPENDENT
+              key: 'ws.threat.count[{#TID}]'
+              history: 365d
+              description: 'Severidade {#SEV} · categoria {#CAT}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var a = JSON.parse(value || "[]");
+                      if (!Array.isArray(a)) a = [a];
+                      var d = [];
+                      for (var i = 0; i < a.length; i++) if (String(a[i].ThreatID) === "{#TID}") d.push(a[i]);
+                      function ts(s) { s = String(s || ""); if (s.length < 14) return 0; return Date.UTC(+s.substr(0,4), +s.substr(4,2) - 1, +s.substr(6,2), +s.substr(8,2), +s.substr(10,2), +s.substr(12,2)) / 1000; }
+                      d.sort(function (x, y) { return ts(y.InitialDetectionTime) - ts(x.InitialDetectionTime); });
+                      var last = d[0];
+                      return d.length;
+              master_item:
+                key: 'wmi.getall[root\Microsoft\Windows\Defender,"select DetectionID,ThreatID,ThreatStatusID,InitialDetectionTime,LastThreatStatusChangeTime,RemediationTime,ProcessName,DomainUser,Resources,ActionSuccess,DetectionSourceTypeID,CleaningActionID from MSFT_MpThreatDetection"]'
+              tags:
+                - tag: category
+                  value: '{#CAT}'
+                - tag: component
+                  value: defender
+                - tag: severity
+                  value: '{#SEV}'
+                - tag: threat
+                  value: '{#TNAME}'
+            - uuid: 4422cbed1b7c44e4be3d73dbc60455bd
+              name: 'Ameaça {#TNAME}: detalhe da última detecção'
+              type: DEPENDENT
+              key: 'ws.threat.info[{#TID}]'
+              history: 365d
+              value_type: TEXT
+              description: 'Usuário | processo | arquivo/recurso'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var a = JSON.parse(value || "[]");
+                      if (!Array.isArray(a)) a = [a];
+                      var d = [];
+                      for (var i = 0; i < a.length; i++) if (String(a[i].ThreatID) === "{#TID}") d.push(a[i]);
+                      function ts(s) { s = String(s || ""); if (s.length < 14) return 0; return Date.UTC(+s.substr(0,4), +s.substr(4,2) - 1, +s.substr(6,2), +s.substr(8,2), +s.substr(10,2), +s.substr(12,2)) / 1000; }
+                      d.sort(function (x, y) { return ts(y.InitialDetectionTime) - ts(x.InitialDetectionTime); });
+                      var last = d[0];
+                      if (!last) return "—";
+                      var r = String(last.Resources || "").replace(/^\[|\]$/g, "").replace(/file:_/g, "");
+                      var p = String(last.ProcessName || "").split("\\").pop();
+                      var out = String(last.DomainUser || "?") + " | " + (p || "?") + " | " + r;
+                      return out.replace(/\\\\/g, "\\");
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1d
+              master_item:
+                key: 'wmi.getall[root\Microsoft\Windows\Defender,"select DetectionID,ThreatID,ThreatStatusID,InitialDetectionTime,LastThreatStatusChangeTime,RemediationTime,ProcessName,DomainUser,Resources,ActionSuccess,DetectionSourceTypeID,CleaningActionID from MSFT_MpThreatDetection"]'
+              tags:
+                - tag: category
+                  value: '{#CAT}'
+                - tag: component
+                  value: defender
+                - tag: severity
+                  value: '{#SEV}'
+                - tag: threat
+                  value: '{#TNAME}'
+            - uuid: 6de414f1eb7b492dba062200ad2ed271
+              name: 'Ameaça {#TNAME}: última detecção'
+              type: DEPENDENT
+              key: 'ws.threat.last[{#TID}]'
+              history: 365d
+              units: unixtime
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var a = JSON.parse(value || "[]");
+                      if (!Array.isArray(a)) a = [a];
+                      var d = [];
+                      for (var i = 0; i < a.length; i++) if (String(a[i].ThreatID) === "{#TID}") d.push(a[i]);
+                      function ts(s) { s = String(s || ""); if (s.length < 14) return 0; return Date.UTC(+s.substr(0,4), +s.substr(4,2) - 1, +s.substr(6,2), +s.substr(8,2), +s.substr(10,2), +s.substr(12,2)) / 1000; }
+                      d.sort(function (x, y) { return ts(y.InitialDetectionTime) - ts(x.InitialDetectionTime); });
+                      var last = d[0];
+                      return last ? ts(last.InitialDetectionTime) : 0;
+              master_item:
+                key: 'wmi.getall[root\Microsoft\Windows\Defender,"select DetectionID,ThreatID,ThreatStatusID,InitialDetectionTime,LastThreatStatusChangeTime,RemediationTime,ProcessName,DomainUser,Resources,ActionSuccess,DetectionSourceTypeID,CleaningActionID from MSFT_MpThreatDetection"]'
+              tags:
+                - tag: category
+                  value: '{#CAT}'
+                - tag: component
+                  value: defender
+                - tag: severity
+                  value: '{#SEV}'
+                - tag: threat
+                  value: '{#TNAME}'
+            - uuid: 8c34929769384581beaa00492c266a6e
+              name: 'Ameaça {#TNAME}: status da última detecção'
+              type: DEPENDENT
+              key: 'ws.threat.status[{#TID}]'
+              history: 365d
+              valuemap:
+                name: 'Defender ThreatStatusID'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var a = JSON.parse(value || "[]");
+                      if (!Array.isArray(a)) a = [a];
+                      var d = [];
+                      for (var i = 0; i < a.length; i++) if (String(a[i].ThreatID) === "{#TID}") d.push(a[i]);
+                      function ts(s) { s = String(s || ""); if (s.length < 14) return 0; return Date.UTC(+s.substr(0,4), +s.substr(4,2) - 1, +s.substr(6,2), +s.substr(8,2), +s.substr(10,2), +s.substr(12,2)) / 1000; }
+                      d.sort(function (x, y) { return ts(y.InitialDetectionTime) - ts(x.InitialDetectionTime); });
+                      var last = d[0];
+                      return last ? Number(last.ThreatStatusID) : 0;
+              master_item:
+                key: 'wmi.getall[root\Microsoft\Windows\Defender,"select DetectionID,ThreatID,ThreatStatusID,InitialDetectionTime,LastThreatStatusChangeTime,RemediationTime,ProcessName,DomainUser,Resources,ActionSuccess,DetectionSourceTypeID,CleaningActionID from MSFT_MpThreatDetection"]'
+              tags:
+                - tag: category
+                  value: '{#CAT}'
+                - tag: component
+                  value: defender
+                - tag: severity
+                  value: '{#SEV}'
+                - tag: threat
+                  value: '{#TNAME}'
+          master_item:
+            key: 'wmi.getall[root\Microsoft\Windows\Defender,"select ThreatID,ThreatName,SeverityID,CategoryID,IsActive,DidThreatExecute,Resources from MSFT_MpThreat"]'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var a = JSON.parse(value || "[]");
+                  if (!Array.isArray(a)) a = [a];
+                  var sev = {0:"Desconhecida",1:"Baixa",2:"Moderada",4:"Alta",5:"Grave"};
+                  var cat = {1:"Adware",2:"Spyware",3:"Ladrão de senhas",4:"Trojan downloader",5:"Worm",6:"Backdoor",7:"Trojan acesso remoto",8:"Trojan",10:"Keylogger",13:"Modificador de navegador",18:"Desativador de segurança",21:"Bundler",24:"Toolbar",25:"Controle remoto",27:"Software indesejado (PUA)",30:"Exploit",34:"Ferramenta",37:"Trojan dropper",42:"Vírus",46:"Comportamento",50:"Ransomware",51:"Regra ASR"};
+                  var out = [];
+                  for (var i = 0; i < a.length; i++) out.push({"{#TID}": String(a[i].ThreatID), "{#TNAME}": String(a[i].ThreatName), "{#SEV}": sev[a[i].SeverityID] || String(a[i].SeverityID), "{#CAT}": cat[a[i].CategoryID] || ("categoria " + a[i].CategoryID)});
+                  return JSON.stringify(out);
+      tags:
+        - tag: class
+          value: os
+        - tag: target
+          value: workstation
+      macros:
+        - macro: '{$WS.PATCH.MAXAGE}'
+          value: '45'
+          description: 'Dias sem atualização do Windows para alertar'
+        - macro: '{$WS.REBOOT.MAXAGE}'
+          value: 3d
+          description: 'Tempo com reinício pendente para alertar'
+        - macro: '{$WS.SIG.MAXAGE}'
+          value: '5'
+          description: 'Idade máxima (dias) da assinatura do Defender para considerar a proteção OK'
+      valuemaps:
+        - uuid: 9b2d730ef25b45629b44d4af749a425f
+          name: 'Defender ThreatStatusID'
+          mappings:
+            - value: '0'
+              newvalue: Desconhecido
+            - value: '1'
+              newvalue: 'Detectada (ativa)'
+            - value: '2'
+              newvalue: Limpa
+            - value: '3'
+              newvalue: 'Em quarentena'
+            - value: '4'
+              newvalue: Removida
+            - value: '5'
+              newvalue: Permitida
+            - value: '6'
+              newvalue: Bloqueada
+            - value: '102'
+              newvalue: 'Falha ao pôr em quarentena'
+            - value: '103'
+              newvalue: 'Falha ao remover'
+            - value: '104'
+              newvalue: 'Falha ao permitir'
+            - value: '105'
+              newvalue: Abandonada
+            - value: '106'
+              newvalue: Resolvida/ignorada
+            - value: '107'
+              newvalue: 'Falha ao bloquear'
